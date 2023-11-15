@@ -1,0 +1,15 @@
+{
+    "$schema": "schema/package-schema.json",
+    "url": "http://obs-config.prd.noice.com/v1",
+    "version": 1,
+    "files": [
+        {
+            "name": "services.json",
+            "version": 1
+        },
+        {
+            "name": "regions.json",
+            "version": 1
+        }
+    ]
+}
