@@ -178,7 +178,10 @@ struct hsv_util {
 		float s = (float)saturation / 255.0f; // 0.0-1.0
 		float v = (float)value / 255.0f;      // 0.0-1.0
 
-		float r = 0.0f, g = 0.0f, b = 0.0f; // 0.0-1.0
+		// 0.0-1.0
+		float r = 0.0f;
+		float g = 0.0f;
+		float b = 0.0f;
 
 		int hi = (int)(h / 60.0f) % 6;
 		float f = (h / 60.0f) - hi;
@@ -188,22 +191,34 @@ struct hsv_util {
 
 		switch (hi) {
 		case 0:
-			r = v, g = t, b = p;
+			r = v;
+			g = t;
+			b = p;
 			break;
 		case 1:
-			r = q, g = v, b = p;
+			r = q;
+			g = v;
+			b = p;
 			break;
 		case 2:
-			r = p, g = v, b = t;
+			r = p;
+			g = v;
+			b = t;
 			break;
 		case 3:
-			r = p, g = q, b = v;
+			r = p;
+			g = q;
+			b = v;
 			break;
 		case 4:
-			r = t, g = p, b = v;
+			r = t;
+			g = p;
+			b = v;
 			break;
 		case 5:
-			r = v, g = p, b = q;
+			r = v;
+			g = p;
+			b = q;
 			break;
 		}
 

@@ -21,7 +21,12 @@
 #include <obs-module.h>
 
 #define DMON_IMPL
+COMPILER_WARNINGS_PUSH
+#if !defined(COMPILER_MSVC)
+COMPILER_WARNINGS_DISABLE("-Wmissing-field-initializers")
+#endif
 #include <dmon/dmon.h>
+COMPILER_WARNINGS_POP
 
 #if ENABLE_SINGLETON_SOURCE
 static constexpr std::string_view NOICE_VALIDATOR_SOURCE_NAME_SINGLETON = "Noice Validator (Singleton)";

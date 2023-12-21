@@ -85,7 +85,14 @@ noice::ui::dock::chat::~chat()
 
 QAction *noice::ui::dock::chat::add_obs_dock()
 {
+	COMPILER_WARNINGS_PUSH
+#if COMPILER_MSVC
+	COMPILER_WARNINGS_DISABLE(4996)
+#else
+	COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
+#endif
 	QAction *action = reinterpret_cast<QAction *>(obs_frontend_add_dock(this));
+	COMPILER_WARNINGS_POP
 	action->setObjectName("noice::chat::action");
 	action->setText(windowTitle());
 

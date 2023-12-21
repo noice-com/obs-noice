@@ -52,6 +52,7 @@ const char *NOICE_VALIDATOR_PLUGIN_ID = "noice_validator";
 
 #define HANDLE_RADIUS 12.0f
 
+#if 0
 static void DrawSquareAtPos(float x, float y)
 {
 	struct vec3 pos;
@@ -89,6 +90,7 @@ static void DrawLine(float x1, float y1, float x2, float y2, float thickness, ve
 	gs_draw(GS_TRISTRIP, 0, 0);
 	gs_vertexbuffer_destroy(line);
 }
+#endif
 
 static void DrawRect(float thickness, vec2 scale)
 {

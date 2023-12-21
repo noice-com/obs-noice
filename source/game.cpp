@@ -31,19 +31,28 @@ static noice::box_tuple convert_box(noice::box_tuple box, noice::box_format in_f
 	noice::box_tuple result;
 
 	if (in_fmt == noice::XYXY) {
-		x1 = a1, y1 = a2, x2 = a3, y2 = a4;
+		x1 = a1;
+		y1 = a2;
+		x2 = a3;
+		y2 = a4;
 		w = x2 - x1;
 		h = y2 - y1;
 		cx = (x1 + x2) * 0.5f;
 		cy = (y1 + y2) * 0.5f;
 	} else if (in_fmt == noice::XYWH) {
-		x1 = a1, y1 = a2, w = a3, h = a4;
+		x1 = a1;
+		y1 = a2;
+		w = a3;
+		h = a4;
 		x2 = x1 + w;
 		y2 = y1 + h;
 		cx = (x1 + x2) * 0.5f;
 		cy = (y1 + y2) * 0.5f;
 	} else if (in_fmt == noice::CXCYWH) {
-		cx = a1, cy = a2, w = a3, h = a4;
+		cx = a1;
+		cy = a2;
+		w = a3;
+		h = a4;
 		x1 = cx - w * 0.5f;
 		y1 = cy - h * 0.5f;
 		x2 = cx + w * 0.5f;

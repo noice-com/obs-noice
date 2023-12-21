@@ -85,7 +85,15 @@ noice::ui::dock::eventlist::~eventlist()
 
 QAction *noice::ui::dock::eventlist::add_obs_dock()
 {
+	COMPILER_WARNINGS_PUSH
+#if COMPILER_MSVC
+	COMPILER_WARNINGS_DISABLE(4996)
+#else
+	COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
+#endif
 	QAction *action = reinterpret_cast<QAction *>(obs_frontend_add_dock(this));
+	COMPILER_WARNINGS_POP
+
 	action->setObjectName("noice::eventlist::action");
 	action->setText(windowTitle());
 
