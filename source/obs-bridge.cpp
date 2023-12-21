@@ -21,7 +21,7 @@
 #if defined(_WIN32)
 #define LIBOBS_NAME "obs.dll"
 #elif defined(__APPLE__)
-#define LIBOBS_NAME "libobs.dylib"
+#define LIBOBS_NAME "libobs.framework/Versions/Current/libobs"
 #else
 #define LIBOBS_NAME "libobs.so"
 #endif
