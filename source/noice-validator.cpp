@@ -585,9 +585,16 @@ void noice::source::validator_instance::sceneitem_set_transform(obs_sceneitem_t 
 	obs_sceneitem_set_locked(item, true);
 
 	struct obs_transform_info cur_info;
+
+#if COMPILER_MSVC
+	COMPILER_WARNINGS_DISABLE(4996)
+#else
+	COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
+#endif
 	obs_sceneitem_get_info(item, &cur_info);
 	if (memcmp(&cur_info, &_info, sizeof(struct obs_transform_info)))
 		obs_sceneitem_set_info(item, &_info);
+	COMPILER_WARNINGS_POP
 
 	struct obs_sceneitem_crop cur_crop;
 	obs_sceneitem_get_crop(item, &cur_crop);
