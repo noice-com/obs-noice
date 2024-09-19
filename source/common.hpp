@@ -104,15 +104,18 @@ class configuration {
 	std::shared_ptr<obs_data_t> _data;
 	std::mutex _lock;
 	std::mutex _services_lock;
+	std::mutex _streaming_active_lock;
 	std::thread _task;
 	bool _noice_service_selected;
 	std::string _deployment;
+	std::string _stream_key;
 	bool _is_slobs;
 	obs_service_t *_current_service_obj;
 	signal_handler_t *_signal_handler;
 	time_t _rtmp_services_json_ts;
 	time_t _services_json_ts;
 	time_t _regions_json_ts;
+	bool _streaming_active;
 
 public:
 	virtual ~configuration();
@@ -121,7 +124,10 @@ public:
 	virtual std::shared_ptr<obs_data_t> get();
 
 	virtual bool noice_service_selected() { return _noice_service_selected; };
+	virtual bool streaming_active();
+	virtual void set_streaming_active(bool active);
 	virtual std::string deployment() { return _deployment; }
+	virtual std::string stream_key() { return _stream_key; }
 	virtual bool is_slobs() { return _is_slobs; }
 	virtual bool can_update_source_names() { return _is_slobs == false; }
 

@@ -60,6 +60,8 @@ class validator_instance : public obs::source_instance {
 	bool _draw_all_regions;
 	bool _debug_sources;
 
+	std::vector<std::string> _hit_source_names;
+
 	struct vec4 _color_region[2];
 	struct vec4 _color_source[2];
 	struct vec4 _color_source_collides[2];
@@ -90,7 +92,7 @@ private:
 
 	void region_draw(noice::region &region);
 
-	void source_draw(obs_sceneitem_t *item);
+	void source_draw(obs_sceneitem_t *item, bool collect_hit_source_names);
 
 	void update_game_prop(obs_property_t *prop);
 

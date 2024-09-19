@@ -15,10 +15,13 @@
 
 #include "scene-tracker.hpp"
 #include "common.hpp"
+#include "auth.hpp"
 #include "noice-validator.hpp"
 #include <fstream>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <obs-module.h>
+#include <util/util-curl.hpp>
 
 #define DMON_IMPL
 COMPILER_WARNINGS_PUSH
@@ -36,6 +39,8 @@ noice::source::scene_tracker::~scene_tracker()
 {
 	os_task_queue_wait(_task_queue);
 	os_task_queue_destroy(_task_queue);
+	os_task_queue_wait(_diagnostics_task_queue);
+	os_task_queue_destroy(_diagnostics_task_queue);
 	obs_remove_tick_callback(obs_tick_handler, this);
 
 	release_sources();
@@ -45,6 +50,7 @@ noice::source::scene_tracker::~scene_tracker()
 
 noice::source::scene_tracker::scene_tracker()
 	: _time_elapsed(0.0f),
+	  _time_elapsed_diagnostics(0.0f),
 #if ENABLE_SINGLETON_SOURCE
 	  _current_scene(nullptr),
 	  _current_source(nullptr),
@@ -57,10 +63,13 @@ noice::source::scene_tracker::scene_tracker()
 	  _startup_complete(false),
 	  _has_finished_loading(false),
 	  _task_queue(nullptr),
-	  _dmon_initialized(false)
+	  _dmon_initialized(false),
+	  _current_scene_has_noice_validator(false)
 {
 	_task_queue = os_task_queue_create();
 	queue_task([](void *param) { os_set_thread_name("noice thread"); }, (void *)this, false);
+	_diagnostics_task_queue = os_task_queue_create();
+	queue_task([](void *param) { os_set_thread_name("noice diagnostics thread"); }, nullptr, false);
 
 	obs_add_tick_callback(obs_tick_handler, this);
 
@@ -221,6 +230,27 @@ void noice::source::scene_tracker::tick_handler()
 	if (_frontend_scene_reset) {
 		DLOG_INFO("tick_handler: SCENE CHANGED");
 		_frontend_scene_reset = false;
+		_hit_source_names.clear();
+
+		obs_source_t *src = obs_weak_source_get_source(_current_output_source);
+		if (src) {
+			obs_scene_t *scene = obs_scene_from_source(src);
+			auto cb = [](obs_scene_t *scene, obs_sceneitem_t *item, void *param) -> bool {
+				obs_source_t *item_source = obs_sceneitem_get_source(item);
+				const char *src_id = obs_source_get_id(item_source);
+
+				if (src_id && !strcmp(src_id, "noice_validator")) {
+					auto st = reinterpret_cast<noice::source::scene_tracker *>(param);
+					st->set_current_scene_has_noice_validator(true);
+					return false;
+				}
+
+				return true;
+			};
+			set_current_scene_has_noice_validator(false);
+			obs_scene_enum_items(scene, cb, this);
+			obs_source_release(src);
+		}
 
 #if ENABLE_SINGLETON_SOURCE
 		validator_track_scene(get_current_scene(true));
@@ -242,12 +272,170 @@ void noice::source::scene_tracker::tick_handler()
 
 		noice::configuration::instance()->probe_service_changed();
 	}
+
+	diagnostics_tick();
+	send_diagnostics_if_ready();
+}
+
+bool noice::source::scene_tracker::current_scene_has_noice_validator()
+{
+	return _current_scene_has_noice_validator;
+}
+
+void noice::source::scene_tracker::set_current_scene_has_noice_validator(bool has)
+{
+	std::unique_lock<std::mutex> lock(_diagnostics_lock);
+
+	_current_scene_has_noice_validator = has;
+}
+
+void noice::source::scene_tracker::add_hit_item_source_names(std::vector<std::string> &names)
+{
+	std::unique_lock<std::mutex> lock(_diagnostics_lock);
+
+	_hit_source_names = std::move(names);
+	_waiting_diagnostics[diagnostics_type::hit_source_names] = false;
+}
+
+void noice::source::scene_tracker::send_diagnostics(void *param)
+{
+	noice::source::scene_tracker *st = reinterpret_cast<noice::source::scene_tracker *>(param);
+
+	auto auth = noice::auth::instance();
+	auto access_token = auth->get_access_token();
+
+	if (!access_token) {
+		DLOG_WARNING("failed to get access token");
+		return;
+	}
+
+	std::ostringstream auth_header;
+	auth_header << "Bearer " << (*access_token);
+
+	std::unique_lock<std::mutex> lock(st->_diagnostics_lock);
+
+	bool missingValidator = !st->current_scene_has_noice_validator();
+
+	std::vector<std::string> hit_item_source_names = std::move(st->_hit_source_names);
+
+	nlohmann::json payload = {
+		{"event",
+		 {
+			 {"obsPluginInfo",
+			  {
+				  {"obsVersion", obs_get_version_string()},
+				  {"pluginVersion", PROJECT_VERSION},
+			  }},
+			 {"obsNoiceValidator",
+			  {
+				  {"missingValidator", missingValidator},
+				  {"occludingSourceNames", hit_item_source_names},
+			  }},
+		 }},
+	};
+
+	lock.unlock();
+
+	std::ostringstream response_stream;
+
+	auto cb = [&response_stream](void *data, size_t size, size_t nmemb) -> size_t {
+		const char *res = reinterpret_cast<char *>(data);
+		response_stream.write(res, size * nmemb);
+
+		return size * nmemb;
+	};
+
+	std::string json = payload.dump();
+
+	std::string endpoint = noice::get_api_endpoint("v1/streamer/diagnostics");
+
+	noice::util::curl c;
+	c.set_option(CURLOPT_URL, endpoint);
+	c.set_option(CURLOPT_POST, true);
+	c.set_header("Content-Type", "application/json");
+	c.set_header("Authorization", auth_header.str());
+	c.set_option(CURLOPT_POSTFIELDS, json.c_str());
+	c.set_write_callback(cb);
+
+	CURLcode code = c.perform();
+
+	lock.lock();
+	st->_queued_diagnostics = false;
+	st->clear_diagnostics();
+	lock.unlock();
+
+	if (code != CURLE_OK) {
+		DLOG_WARNING("diagnostics request failed.");
+		return;
+	}
+
+	long response_code = -1;
+	c.get_info(CURLINFO_RESPONSE_CODE, response_code);
+
+	if (response_code != 200) {
+		DLOG_WARNING("diagnostics request failed with code: %ld, response: %s", response_code, response_stream.str().c_str());
+		return;
+	}
+}
+
+bool noice::source::scene_tracker::needs_diagnostics(diagnostics_type type)
+{
+	std::unique_lock<std::mutex> lock(_diagnostics_lock);
+
+	auto it = _waiting_diagnostics.find(type);
+
+	return it != _waiting_diagnostics.end() && it->second;
+}
+
+void noice::source::scene_tracker::clear_diagnostics()
+{
+	_waiting_diagnostics.clear();
+}
+
+void noice::source::scene_tracker::diagnostics_tick()
+{
+	if (_time_elapsed_diagnostics <= 10.0) {
+		return;
+	}
+
+	_time_elapsed_diagnostics = 0.0f;
+
+	auto cfg = noice::configuration::instance();
+
+	std::unique_lock<std::mutex> lock(_diagnostics_lock);
+
+	clear_diagnostics();
+
+	if (!cfg->streaming_active() || !cfg->noice_service_selected()) {
+		return;
+	}
+
+	_waiting_diagnostics[diagnostics_type::hit_source_names] = true;
+}
+
+void noice::source::scene_tracker::send_diagnostics_if_ready()
+{
+	std::unique_lock<std::mutex> lock(_diagnostics_lock);
+
+	if (_queued_diagnostics || _waiting_diagnostics.size() == 0) {
+		return;
+	}
+
+	for (const auto &pair : _waiting_diagnostics) {
+		if (pair.second) {
+			return;
+		}
+	}
+
+	_queued_diagnostics = true;
+	queue_task(send_diagnostics, this, false, _diagnostics_task_queue);
 }
 
 void noice::source::scene_tracker::obs_tick_handler(void *private_data, float seconds)
 {
 	noice::source::scene_tracker *self = reinterpret_cast<noice::source::scene_tracker *>(private_data);
 	self->_time_elapsed += seconds;
+	self->_time_elapsed_diagnostics += seconds;
 	self->tick_handler();
 }
 
@@ -305,9 +493,13 @@ static void task_wait_callback(void *param)
 	os_event_signal(info->event);
 }
 
-void noice::source::scene_tracker::queue_task(os_task_t task, void *param, bool wait)
+void noice::source::scene_tracker::queue_task(os_task_t task, void *param, bool wait, os_task_queue_t *queue)
 {
-	if (os_task_queue_inside(_task_queue)) {
+	if (!queue) {
+		queue = _task_queue;
+	}
+
+	if (os_task_queue_inside(queue)) {
 		task(param);
 	} else if (wait) {
 		struct task_wait_info info = {};
@@ -315,11 +507,11 @@ void noice::source::scene_tracker::queue_task(os_task_t task, void *param, bool 
 		info.param = param;
 
 		os_event_init(&info.event, OS_EVENT_TYPE_MANUAL);
-		queue_task(task_wait_callback, &info, false);
+		queue_task(task_wait_callback, &info, false, queue);
 		os_event_wait(info.event);
 		os_event_destroy(info.event);
 	} else {
-		os_task_queue_queue_task(_task_queue, task, param);
+		os_task_queue_queue_task(queue, task, param);
 	}
 }
 

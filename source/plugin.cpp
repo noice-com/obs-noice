@@ -37,6 +37,7 @@ MODULE_EXPORT bool obs_module_load()
 	try {
 		obs::bridge::initialize();
 		noice::bridge::initialize();
+		noice::auth::initialize();
 		noice::game_manager::initialize();
 		noice::configuration::initialize();
 		noice::configuration::instance()->refresh();

@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Noice Inc.
+// Copyright (C) 2024 Noice Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,37 +14,44 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
-#include <string>
+
 #include <memory>
-#include "common.hpp"
-#include "scene-tracker.hpp"
-#include "game.hpp"
-#include "auth.hpp"
+#include <mutex>
+#include <optional>
 
 namespace noice {
-class bridge {
-public:
-	virtual ~bridge();
-	bridge();
-
-	virtual std::shared_ptr<noice::configuration> configuration_instance();
-	virtual std::shared_ptr<noice::source::scene_tracker> scene_tracker_instance();
-	virtual std::shared_ptr<noice::game_manager> game_manager_instance();
-	virtual std::shared_ptr<noice::auth> auth_instance();
-
-	virtual std::string get_web_endpoint(std::string_view const args = "");
-	virtual std::string_view get_unique_identifier();
-
-	// Singleton
+class auth {
 private:
-	static std::shared_ptr<noice::bridge> _instance;
+	std::mutex _lock;
+
+	long long _token_expiration;
+	std::string _access_token;
+	std::string _refresh_token;
+	std::string _uid;
 
 public:
+	virtual ~auth();
+	auth();
+
+private:
+	bool sign_in();
+	bool refresh_token();
+	void reset_access_token();
+	bool handle_signin_response(const std::string &res);
+	bool is_token_valid();
+	bool is_token_expired();
+
+public:
+	virtual std::optional<std::string> get_access_token();
+
+private /* Singleton */:
+	static std::shared_ptr<noice::auth> _instance;
+
+public /* Singleton */:
 	static void initialize();
+
 	static void finalize();
 
-	static std::shared_ptr<noice::bridge> instance();
+	static std::shared_ptr<noice::auth> instance();
 };
-
-noice::bridge *get_bridge();
 } // namespace noice

@@ -422,7 +422,7 @@ void noice::source::validator_instance::region_draw(noice::region &region)
 	region.hits = 0;
 }
 
-void noice::source::validator_instance::source_draw(obs_sceneitem_t *item)
+void noice::source::validator_instance::source_draw(obs_sceneitem_t *item, bool collect_hit_source_names)
 {
 	if (!obs_sceneitem_visible(item))
 		return;
@@ -436,7 +436,9 @@ void noice::source::validator_instance::source_draw(obs_sceneitem_t *item)
 
 		matrix4_copy(&_parent_transform, &mat);
 
-		auto source_draw_item = [this](obs_sceneitem_t *item) { source_draw(item); };
+		auto source_draw_item = [this, collect_hit_source_names](obs_sceneitem_t *item) {
+			source_draw(item, collect_hit_source_names);
+		};
 		using source_draw_item_t = decltype(source_draw_item);
 
 		obs_sceneitem_group_enum_items(
@@ -470,6 +472,13 @@ void noice::source::validator_instance::source_draw(obs_sceneitem_t *item)
 
 	if (_debug_sources == false && hits == 0)
 		return;
+
+	if (collect_hit_source_names) {
+		obs_source_t *item_source = obs_sceneitem_get_source(item);
+		const char *src_name = obs_source_get_name(item_source);
+
+		this->_hit_source_names.push_back(std::string(src_name));
+	}
 
 	GS_DEBUG_MARKER_BEGIN(GS_DEBUG_COLOR_DEFAULT, "source_draw");
 
@@ -586,6 +595,7 @@ void noice::source::validator_instance::sceneitem_set_transform(obs_sceneitem_t 
 
 	struct obs_transform_info cur_info;
 
+	COMPILER_WARNINGS_PUSH
 #if COMPILER_MSVC
 	COMPILER_WARNINGS_DISABLE(4996)
 #else
@@ -1104,6 +1114,8 @@ void noice::source::validator_instance::video_render(gs_effect_t *)
 {
 	update_current_enum_scene();
 
+	bool collect_hit_source_names = scene_tracker::instance()->needs_diagnostics(diagnostics_type::hit_source_names);
+
 	struct obs_video_info ovi = {};
 	if (!obs_get_video_info(&ovi))
 		return;
@@ -1156,7 +1168,13 @@ void noice::source::validator_instance::video_render(gs_effect_t *)
 	if (scene) {
 		gs_matrix_push();
 
-		auto source_draw_item = [this](obs_sceneitem_t *item) { source_draw(item); };
+		if (collect_hit_source_names) {
+			_hit_source_names.clear();
+		}
+
+		auto source_draw_item = [this, collect_hit_source_names](obs_sceneitem_t *item) {
+			source_draw(item, collect_hit_source_names);
+		};
 		using source_draw_item_t = decltype(source_draw_item);
 
 		obs_scene_enum_items(
@@ -1168,6 +1186,10 @@ void noice::source::validator_instance::video_render(gs_effect_t *)
 				return true;
 			},
 			&source_draw_item);
+
+		if (collect_hit_source_names) {
+			scene_tracker::instance()->add_hit_item_source_names(_hit_source_names);
+		}
 
 		for (noice::region &region : *_game->regions()) {
 			region_draw(region);

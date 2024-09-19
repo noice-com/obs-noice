@@ -120,6 +120,8 @@ target_sources(
           "source/noice-validator.cpp"
           "source/scene-tracker.hpp"
           "source/scene-tracker.cpp"
+          "source/auth.hpp"
+          "source/auth.cpp"
           "source/obs/obs-source-factory.hpp"
           "source/obs/obs-source.hpp"
           "source/util/util.hpp"

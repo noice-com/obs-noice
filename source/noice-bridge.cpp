@@ -39,6 +39,11 @@ std::shared_ptr<noice::game_manager> noice::bridge::game_manager_instance()
 	return noice::game_manager::instance();
 }
 
+std::shared_ptr<noice::auth> noice::bridge::auth_instance()
+{
+	return noice::auth::instance();
+}
+
 std::string noice::bridge::get_web_endpoint(std::string_view const args)
 {
 	return noice::get_web_endpoint(args);

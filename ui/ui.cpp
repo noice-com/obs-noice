@@ -26,6 +26,8 @@
 #include "common.hpp"
 #include "scene-tracker.hpp"
 #include "noice-bridge.hpp"
+#include <obs.h>
+#include "util/util-curl.hpp"
 
 static constexpr std::string_view I18N_MENU = "Menu";
 static constexpr std::string_view I18N_MENU_CHECKFORUPDATES = "Menu.CheckForUpdates";
@@ -132,6 +134,14 @@ void noice::ui::ui::obs_event_handler(obs_frontend_event event, void *private_da
 		obs_source_t *program_source = obs_frontend_get_current_scene();
 		scene_tracker->set_current_scene(program_source);
 		obs_source_release(program_source);
+	} break;
+	case OBS_FRONTEND_EVENT_STREAMING_STARTED: {
+		auto cfg = noice::get_bridge()->configuration_instance();
+		cfg->set_streaming_active(true);
+	} break;
+	case OBS_FRONTEND_EVENT_STREAMING_STOPPED: {
+		auto cfg = noice::get_bridge()->configuration_instance();
+		cfg->set_streaming_active(false);
 	} break;
 	default:
 		break;

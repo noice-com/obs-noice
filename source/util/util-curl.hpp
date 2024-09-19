@@ -90,6 +90,16 @@ public:
 		return CURLE_OK;
 	};
 
+	CURLcode get_info(CURLINFO info, long &value)
+	{
+		long val;
+		if (CURLcode res = curl_easy_getinfo(_curl, info, &val); res != CURLE_OK) {
+			return res;
+		}
+		value = val;
+		return CURLE_OK;
+	}
+
 	void clear_headers();
 
 	void clear_header(std::string_view header);

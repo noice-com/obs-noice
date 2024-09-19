@@ -58,6 +58,7 @@ noice::configuration::~configuration()
 noice::configuration::configuration()
 	: _lock(),
 	  _services_lock(),
+	  _streaming_active_lock(),
 	  _task(),
 	  _noice_service_selected(false),
 	  _deployment(NOICE_DEPLOYMENT_PRD),
@@ -66,7 +67,8 @@ noice::configuration::configuration()
 	  _signal_handler(signal_handler_create()),
 	  _rtmp_services_json_ts(-1),
 	  _services_json_ts(-1),
-	  _regions_json_ts(-1)
+	  _regions_json_ts(-1),
+	  _streaming_active(false)
 {
 	DLOG_INFO("Loading. Plugin version %s, %sobs version: %s", PROJECT_VERSION, _is_slobs ? "sl" : "", obs_get_version_string());
 
@@ -97,6 +99,20 @@ std::shared_ptr<obs_data_t> noice::configuration::get()
 static std::string ValueOrEmpty(const char *s)
 {
 	return s == nullptr ? std::string() : s;
+}
+
+void noice::configuration::set_streaming_active(bool active)
+{
+	std::unique_lock<std::mutex> lock(_streaming_active_lock);
+
+	_streaming_active = active;
+}
+
+bool noice::configuration::streaming_active()
+{
+	std::unique_lock<std::mutex> lock(_streaming_active_lock);
+
+	return _streaming_active;
 }
 
 void noice::configuration::probe_service_changed()
@@ -131,6 +147,11 @@ void noice::configuration::probe_service_changed()
 			_deployment = NOICE_DEPLOYMENT_STG;
 		else
 			_deployment = NOICE_DEPLOYMENT_PRD;
+
+		const char *svc_key = obs_service_get_key(service_obj);
+		_stream_key = std::string(svc_key);
+	} else {
+		_stream_key = std::string("");
 	}
 	bool deployment_changed = prev_deployment != _deployment;
 	obs_data_set_string(_data.get(), CFG_DEPLOYMENT.data(), _deployment.c_str());
@@ -468,11 +489,10 @@ std::string noice::get_deployment_base_url(bool check_interface)
 	return config_url;
 }
 
-// TODO: Maybe we'll need something like this some day
 std::string noice::get_api_endpoint(std::string_view const args)
 {
 	std::string endpoint = get_deployment_base_url(true);
-	return string_format("https://api.%s/v1/%s", endpoint.c_str(), args.data());
+	return string_format("https://platform.%s/%s", endpoint.c_str(), args.data());
 }
 
 std::string noice::get_package_endpoint(std::string_view const args)

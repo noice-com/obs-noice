@@ -26,9 +26,15 @@
 #define ENABLE_SINGLETON_SOURCE 0
 
 namespace noice::source {
+
+enum class diagnostics_type {
+	hit_source_names,
+};
+
 class scene_tracker {
 private:
 	float _time_elapsed;
+	float _time_elapsed_diagnostics;
 
 #if ENABLE_SINGLETON_SOURCE
 	obs_scene_t *_current_scene;
@@ -45,6 +51,7 @@ private:
 	bool _has_finished_loading;
 
 	os_task_queue_t *_task_queue;
+	os_task_queue_t *_diagnostics_task_queue;
 	std::vector<std::shared_ptr<obs_weak_source_t>> _current_tick_scenes;
 	std::mutex _lock;
 
@@ -56,18 +63,27 @@ private:
 
 	bool _dmon_initialized;
 
+	std::vector<std::string> _hit_source_names;
+	bool _current_scene_has_noice_validator;
+	std::map<diagnostics_type, bool> _waiting_diagnostics;
+	bool _queued_diagnostics;
+	std::mutex _diagnostics_lock;
+
 public:
 	virtual ~scene_tracker();
 	scene_tracker();
 
 private:
 	static void obs_tick_handler(void *private_data, float seconds);
+	static void send_diagnostics(void *param);
 
 	void tick_handler();
 
 #if ENABLE_SINGLETON_SOURCE
 	void validator_track_scene(obs_source_t *source);
 #endif
+
+	void queue_task(os_task_t task, void *param, bool wait, os_task_queue_t *queue = nullptr);
 
 	void load();
 
@@ -83,9 +99,17 @@ private:
 
 	bool scenecollection_parse(std::istream &input);
 
-public:
-	virtual void queue_task(os_task_t task, void *param, bool wait);
+	void diagnostics_tick();
 
+	void set_current_scene_has_noice_validator(bool has);
+
+	bool current_scene_has_noice_validator();
+
+	void clear_diagnostics();
+
+	void send_diagnostics_if_ready();
+
+public:
 	virtual void set_preview_scene(obs_source_t *source);
 
 	virtual void set_current_scene(obs_source_t *source);
@@ -95,6 +119,10 @@ public:
 	virtual obs_weak_source_t *get_current_enum_scene();
 
 	virtual bool has_finished_loading() { return _has_finished_loading; };
+
+	virtual void add_hit_item_source_names(std::vector<std::string> &names);
+
+	virtual bool needs_diagnostics(diagnostics_type type);
 
 private /* Singleton */:
 	static std::shared_ptr<noice::source::scene_tracker> _instance;
