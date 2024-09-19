@@ -92,6 +92,12 @@ void noice::ui::ui::obs_event_handler(obs_frontend_event event, void *private_da
 		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED", (int)event);
 	else if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING)
 		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_FINISHED_LOADING", (int)event);
+	else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTING)
+		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_STREAMING_STARTING", (int)event);
+	else if (event == OBS_FRONTEND_EVENT_STREAMING_STARTED)
+		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_STREAMING_STARTED", (int)event);
+	else if (event == OBS_FRONTEND_EVENT_STREAMING_STOPPED)
+		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_STREAMING_STOPPED", (int)event);
 	else if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN)
 		DLOG_INFO("event: %d OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN", (int)event);
 	else if (event == OBS_FRONTEND_EVENT_EXIT)
@@ -134,6 +140,13 @@ void noice::ui::ui::obs_event_handler(obs_frontend_event event, void *private_da
 		obs_source_t *program_source = obs_frontend_get_current_scene();
 		scene_tracker->set_current_scene(program_source);
 		obs_source_release(program_source);
+	} break;
+	case OBS_FRONTEND_EVENT_STREAMING_STARTING: {
+		auto cfg = noice::get_bridge()->configuration_instance();
+
+		if (cfg->noice_service_selected()) {
+			scene_tracker->trigger_fetch_selected_game();
+		}
 	} break;
 	case OBS_FRONTEND_EVENT_STREAMING_STARTED: {
 		auto cfg = noice::get_bridge()->configuration_instance();

@@ -17,6 +17,7 @@
 #include "common.hpp"
 #include "auth.hpp"
 #include "noice-validator.hpp"
+#include "game.hpp"
 #include <fstream>
 #include <sstream>
 #include <nlohmann/json.hpp>
@@ -271,6 +272,16 @@ void noice::source::scene_tracker::tick_handler()
 		obs_enum_scenes(cb, nullptr);
 
 		noice::configuration::instance()->probe_service_changed();
+
+		{
+			std::unique_lock<std::mutex> lock(_selected_game_lock, std::try_to_lock);
+			if (lock.owns_lock()) {
+				if (_fetched_selected_game != "") {
+					update_selected_game();
+					_fetched_selected_game = "";
+				}
+			}
+		}
 	}
 
 	diagnostics_tick();
@@ -429,6 +440,130 @@ void noice::source::scene_tracker::send_diagnostics_if_ready()
 
 	_queued_diagnostics = true;
 	queue_task(send_diagnostics, this, false, _diagnostics_task_queue);
+}
+
+bool noice::source::scene_tracker::update_selected_game_enum_item(obs_scene_t *scene, obs_sceneitem_t *item, void *param)
+{
+	noice::source::scene_tracker *st = reinterpret_cast<noice::source::scene_tracker *>(param);
+
+	obs_source_t *src = obs_sceneitem_get_source(item);
+	const char *src_id = obs_source_get_id(src);
+
+	if (!strcmp(src_id, "noice_validator")) {
+		obs_data_t *data = obs_source_get_settings(src);
+		obs_data_set_string(data, "game", st->_fetched_selected_game.c_str());
+		obs_source_update(src, data);
+		obs_data_release(data);
+	}
+
+	return true;
+}
+
+void noice::source::scene_tracker::update_selected_game()
+{
+	DLOG_INFO("updating selected game, %s", _fetched_selected_game.c_str());
+	if (!_fetched_selected_game_needs_validator) {
+		_fetched_selected_game = "no_game_selected";
+	}
+
+	auto gm = noice::game_manager::instance();
+	auto game = gm->get_game(_fetched_selected_game);
+
+	if (!game) {
+		DLOG_WARNING("failed to find config for selected game: %s", _fetched_selected_game.c_str());
+		return;
+	}
+
+	auto cb = [](void *param, obs_source_t *source) {
+		obs_scene_t *scene = obs_scene_from_source(source);
+		obs_scene_enum_items(scene, update_selected_game_enum_item, param);
+
+		return true;
+	};
+	obs_enum_scenes(cb, (void *)this);
+}
+
+void noice::source::scene_tracker::fetch_selected_game(void *param)
+{
+	noice::source::scene_tracker *st = reinterpret_cast<noice::source::scene_tracker *>(param);
+
+	std::unique_lock<std::mutex> lock(st->_selected_game_lock);
+
+	if (st->_fetched_selected_game != "") {
+		return;
+	}
+
+	auto auth = noice::auth::instance();
+	auto access_token = auth->get_access_token();
+
+	if (!access_token) {
+		DLOG_WARNING("failed to get access token");
+		return;
+	}
+
+	std::ostringstream auth_header;
+	auth_header << "Bearer " << (*access_token);
+
+	std::string endpoint = noice::get_api_endpoint("v1/streamer/selected_game");
+
+	std::ostringstream response_stream;
+	auto write_cb = [&response_stream](void *data, size_t size, size_t nmemb) -> size_t {
+		const char *res = reinterpret_cast<char *>(data);
+		response_stream.write(res, size * nmemb);
+
+		return size * nmemb;
+	};
+
+	noice::util::curl c;
+	c.set_option(CURLOPT_URL, endpoint);
+	c.set_header("Authorization", auth_header.str());
+	c.set_write_callback(write_cb);
+
+	CURLcode code = c.perform();
+	if (code != CURLE_OK) {
+		DLOG_WARNING("get selected game request failed. %s", curl_easy_strerror(code));
+		return;
+	}
+
+	long response_code = -1;
+	c.get_info(CURLINFO_RESPONSE_CODE, response_code);
+
+	if (response_code != 200) {
+		DLOG_WARNING("get selected game request failed with response code: %ld %s", response_code, response_stream.str().c_str());
+		return;
+	}
+
+	nlohmann::json selected_game_response;
+
+	try {
+		selected_game_response = nlohmann::json::parse(response_stream.str());
+	} catch (...) {
+		DLOG_WARNING("failed to parse response for get selected game request");
+		return;
+	}
+
+	if (!selected_game_response.contains("gameId")) {
+		DLOG_WARNING("response does not contain game id");
+		return;
+	}
+
+	st->_fetched_selected_game = selected_game_response["gameId"].template get<std::string>();
+
+	if (selected_game_response.contains("needsValidator")) {
+		st->_fetched_selected_game_needs_validator = selected_game_response["needsValidator"].template get<bool>();
+	} else {
+		st->_fetched_selected_game_needs_validator = false;
+	}
+
+	DLOG_INFO("got selected game: %s, needs validator: %d", st->_fetched_selected_game.c_str(),
+		  st->_fetched_selected_game_needs_validator);
+}
+
+void noice::source::scene_tracker::trigger_fetch_selected_game()
+{
+	DLOG_INFO("fetching selected game");
+
+	queue_task([](void *param) { fetch_selected_game(param); }, (void *)this, false);
 }
 
 void noice::source::scene_tracker::obs_tick_handler(void *private_data, float seconds)

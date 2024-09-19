@@ -69,6 +69,10 @@ private:
 	bool _queued_diagnostics;
 	std::mutex _diagnostics_lock;
 
+	std::mutex _selected_game_lock;
+	std::string _fetched_selected_game;
+	bool _fetched_selected_game_needs_validator;
+
 public:
 	virtual ~scene_tracker();
 	scene_tracker();
@@ -76,6 +80,8 @@ public:
 private:
 	static void obs_tick_handler(void *private_data, float seconds);
 	static void send_diagnostics(void *param);
+	static void fetch_selected_game(void *param);
+	static bool update_selected_game_enum_item(obs_scene_t *scene, obs_sceneitem_t *item, void *param);
 
 	void tick_handler();
 
@@ -109,6 +115,8 @@ private:
 
 	void send_diagnostics_if_ready();
 
+	void update_selected_game();
+
 public:
 	virtual void set_preview_scene(obs_source_t *source);
 
@@ -123,6 +131,8 @@ public:
 	virtual void add_hit_item_source_names(std::vector<std::string> &names);
 
 	virtual bool needs_diagnostics(diagnostics_type type);
+
+	virtual void trigger_fetch_selected_game();
 
 private /* Singleton */:
 	static std::shared_ptr<noice::source::scene_tracker> _instance;
