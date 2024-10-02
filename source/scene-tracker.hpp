@@ -35,6 +35,7 @@ class scene_tracker {
 private:
 	float _time_elapsed;
 	float _time_elapsed_diagnostics;
+	float _time_elapsed_selected_game;
 
 #if ENABLE_SINGLETON_SOURCE
 	obs_scene_t *_current_scene;
@@ -71,6 +72,7 @@ private:
 
 	std::mutex _selected_game_lock;
 	std::string _fetched_selected_game;
+	std::string _last_selected_game;
 	bool _fetched_selected_game_needs_validator;
 
 public:
@@ -116,6 +118,8 @@ private:
 	void send_diagnostics_if_ready();
 
 	void update_selected_game();
+
+	void update_selected_game_tick();
 
 public:
 	virtual void set_preview_scene(obs_source_t *source);

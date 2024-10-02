@@ -36,6 +36,10 @@ COMPILER_WARNINGS_POP
 static constexpr std::string_view NOICE_VALIDATOR_SOURCE_NAME_SINGLETON = "Noice Validator (Singleton)";
 #endif
 
+constexpr float UPDATE_SELECTED_GAME_INTERVAL = 30.0f;
+constexpr float SEND_DIAGNOSTICS_INTERVAL = 10.0f;
+constexpr float SCENE_CHECK_INTERVAL = 1.0f;
+
 noice::source::scene_tracker::~scene_tracker()
 {
 	os_task_queue_wait(_task_queue);
@@ -52,6 +56,7 @@ noice::source::scene_tracker::~scene_tracker()
 noice::source::scene_tracker::scene_tracker()
 	: _time_elapsed(0.0f),
 	  _time_elapsed_diagnostics(0.0f),
+	  _time_elapsed_selected_game(UPDATE_SELECTED_GAME_INTERVAL),
 #if ENABLE_SINGLETON_SOURCE
 	  _current_scene(nullptr),
 	  _current_source(nullptr),
@@ -70,7 +75,7 @@ noice::source::scene_tracker::scene_tracker()
 	_task_queue = os_task_queue_create();
 	queue_task([](void *param) { os_set_thread_name("noice thread"); }, (void *)this, false);
 	_diagnostics_task_queue = os_task_queue_create();
-	queue_task([](void *param) { os_set_thread_name("noice diagnostics thread"); }, nullptr, false);
+	queue_task([](void *param) { os_set_thread_name("noice diagnostics thread"); }, nullptr, false, _diagnostics_task_queue);
 
 	obs_add_tick_callback(obs_tick_handler, this);
 
@@ -261,7 +266,7 @@ void noice::source::scene_tracker::tick_handler()
 	if (has_finished_loading() == false)
 		return;
 
-	if (_time_elapsed >= 1.0f) {
+	if (_time_elapsed >= SCENE_CHECK_INTERVAL) {
 		_time_elapsed = 0.0f;
 
 		// Not sure if it's worth it to be more signal aware to trigger this
@@ -276,16 +281,20 @@ void noice::source::scene_tracker::tick_handler()
 		{
 			std::unique_lock<std::mutex> lock(_selected_game_lock, std::try_to_lock);
 			if (lock.owns_lock()) {
-				if (_fetched_selected_game != "") {
+				if (_fetched_selected_game != "" && _fetched_selected_game != _last_selected_game) {
 					update_selected_game();
-					_fetched_selected_game = "";
+					_last_selected_game = _fetched_selected_game;
 				}
+
+				_fetched_selected_game = "";
 			}
 		}
 	}
 
 	diagnostics_tick();
 	send_diagnostics_if_ready();
+
+	update_selected_game_tick();
 }
 
 bool noice::source::scene_tracker::current_scene_has_noice_validator()
@@ -405,7 +414,7 @@ void noice::source::scene_tracker::clear_diagnostics()
 
 void noice::source::scene_tracker::diagnostics_tick()
 {
-	if (_time_elapsed_diagnostics <= 10.0) {
+	if (_time_elapsed_diagnostics <= SEND_DIAGNOSTICS_INTERVAL) {
 		return;
 	}
 
@@ -422,6 +431,23 @@ void noice::source::scene_tracker::diagnostics_tick()
 	}
 
 	_waiting_diagnostics[diagnostics_type::hit_source_names] = true;
+}
+
+void noice::source::scene_tracker::update_selected_game_tick()
+{
+	if (_time_elapsed_selected_game <= UPDATE_SELECTED_GAME_INTERVAL) {
+		return;
+	}
+
+	_time_elapsed_selected_game = 0.0f;
+
+	auto cfg = noice::configuration::instance();
+
+	if (cfg->streaming_active() || !cfg->noice_service_selected()) {
+		return;
+	}
+
+	trigger_fetch_selected_game();
 }
 
 void noice::source::scene_tracker::send_diagnostics_if_ready()
@@ -555,15 +581,15 @@ void noice::source::scene_tracker::fetch_selected_game(void *param)
 		st->_fetched_selected_game_needs_validator = false;
 	}
 
-	DLOG_INFO("got selected game: %s, needs validator: %d", st->_fetched_selected_game.c_str(),
-		  st->_fetched_selected_game_needs_validator);
+	if (st->_fetched_selected_game != st->_last_selected_game) {
+		DLOG_INFO("got new selected game: %s, needs validator: %d", st->_fetched_selected_game.c_str(),
+			  st->_fetched_selected_game_needs_validator);
+	}
 }
 
 void noice::source::scene_tracker::trigger_fetch_selected_game()
 {
-	DLOG_INFO("fetching selected game");
-
-	queue_task([](void *param) { fetch_selected_game(param); }, (void *)this, false);
+	queue_task([](void *param) { fetch_selected_game(param); }, (void *)this, false, _diagnostics_task_queue);
 }
 
 void noice::source::scene_tracker::obs_tick_handler(void *private_data, float seconds)
@@ -571,6 +597,7 @@ void noice::source::scene_tracker::obs_tick_handler(void *private_data, float se
 	noice::source::scene_tracker *self = reinterpret_cast<noice::source::scene_tracker *>(private_data);
 	self->_time_elapsed += seconds;
 	self->_time_elapsed_diagnostics += seconds;
+	self->_time_elapsed_selected_game += seconds;
 	self->tick_handler();
 }
 
