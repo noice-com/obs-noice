@@ -32,7 +32,11 @@ target_sources(
           "ui-dock-chat.hpp"
           "ui-dock-chat.cpp"
           "ui-dock-eventlist.hpp"
-          "ui-dock-eventlist.cpp")
+          "ui-dock-eventlist.cpp"
+          "ui-dock-stats.hpp"
+          "ui-dock-stats.cpp"
+          "ui-frame-stats.hpp"
+          "ui-frame-stats.cpp")
 target_compile_definitions(${PROJECT_NAME} PRIVATE UI_ENABLED)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE "$<TARGET_PROPERTY:noice,LINK_LIBRARIES>")

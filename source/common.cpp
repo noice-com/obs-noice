@@ -148,7 +148,14 @@ void noice::configuration::probe_service_changed()
 		else
 			_deployment = NOICE_DEPLOYMENT_PRD;
 
+		COMPILER_WARNINGS_PUSH
+#if COMPILER_MSVC
+		COMPILER_WARNINGS_DISABLE(4996)
+#else
+		COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
+#endif
 		const char *svc_key = obs_service_get_key(service_obj);
+		COMPILER_WARNINGS_POP
 		_stream_key = std::string(svc_key);
 	} else {
 		_stream_key = std::string("");

@@ -25,6 +25,7 @@
 #include <obs-frontend-api.h>
 #include "ui-dock-chat.hpp"
 #include "ui-dock-eventlist.hpp"
+#include "ui-dock-stats.hpp"
 
 namespace noice::ui {
 class ui : public QObject {
@@ -38,11 +39,14 @@ private:
 	QAction *_update_action;
 	QAction *_about_action;
 
+	QSharedPointer<dock::chat> _chat_dock;
+	QAction *_chat_dock_action;
+
 	QSharedPointer<dock::eventlist> _eventlist_dock;
 	QAction *_eventlist_dock_action;
 
-	QSharedPointer<dock::chat> _chat_dock;
-	QAction *_chat_dock_action;
+	QSharedPointer<dock::stats> _stats_dock;
+	QAction *_stats_dock_action;
 
 	bool _core_module_found;
 

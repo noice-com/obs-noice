@@ -69,10 +69,12 @@ noice::ui::ui::ui()
 	  _menu_action(),
 	  _update_action(),
 	  _about_action(),
-	  _eventlist_dock(),
-	  _eventlist_dock_action(),
 	  _chat_dock(),
 	  _chat_dock_action(),
+	  _eventlist_dock(),
+	  _eventlist_dock_action(),
+	  _stats_dock(),
+	  _stats_dock_action(),
 	  _core_module_found(false)
 {
 	obs_frontend_add_event_callback(obs_event_handler, this);
@@ -200,16 +202,20 @@ void noice::ui::ui::load()
 	}
 
 #if 0
+	{ // Chat Dock
+		_chat_dock = QSharedPointer<noice::ui::dock::chat>::create();
+		_chat_dock_action = _chat_dock->add_obs_dock();
+	}
+
 	{ // Event List Dock
 		_eventlist_dock = QSharedPointer<noice::ui::dock::eventlist>::create();
 		_eventlist_dock_action = _eventlist_dock->add_obs_dock();
 	}
-
-	{ // Event List Dock
-		_chat_dock = QSharedPointer<noice::ui::dock::chat>::create();
-		_chat_dock_action = _chat_dock->add_obs_dock();
-	}
 #endif
+	{ // Stats Dock
+		_stats_dock = QSharedPointer<noice::ui::dock::stats>::create();
+		_stats_dock_action = _stats_dock->add_obs_dock();
+	}
 }
 
 void noice::ui::ui::unload()
@@ -229,6 +235,12 @@ void noice::ui::ui::unload()
 		_eventlist_dock_action = nullptr;
 	}
 #endif
+	if (_stats_dock) { // Stats Dock
+		_stats_dock->deleteLater();
+		_stats_dock = nullptr;
+		_stats_dock_action->deleteLater();
+		_stats_dock_action = nullptr;
+	}
 
 	if (_menu) { // Noice Menu
 		_update_action->deleteLater();
