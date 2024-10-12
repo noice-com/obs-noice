@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -67,13 +67,13 @@ jobs:
         shell: zsh {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           path: plugin
           submodules: recursive
 
       - name: Checkout obs-studio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: 'obsproject/obs-studio'
           path: obs-studio
@@ -117,7 +117,7 @@ jobs:
 
       - name: Restore Compilation Cache
         id: ccache-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: ${{ github.workspace }}/.ccache
           key: macos-${{ matrix.arch }}-ccache-plugin-${{ steps.setup.outputs.ccacheDate }}
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload Build Artifact
         if: ${{ success() && (github.event_name != 'pull_request' || steps.seekingTesters.outputs.found == 'true') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PLUGIN_NAME }}-macos-${{ matrix.arch }}-${{ steps.setup.outputs.commitHash }}
           path: ${{ github.workspace }}/plugin/release/${{ env.PLUGIN_NAME }}-*-macos-${{ matrix.arch }}.pkg
@@ -194,13 +194,13 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           path: plugin
           submodules: recursive
 
       - name: Checkout obs-studio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: 'obsproject/obs-studio'
           path: obs-studio
@@ -217,7 +217,7 @@ jobs:
 
       - name: Restore Compilation Cache
         id: ccache-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: ${{ github.workspace }}/.ccache
           key: linux-${{ matrix.arch }}-ccache-plugin-${{ steps.setup.outputs.ccacheDate }}
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload Build Artifact
         if: ${{ success() && (github.event_name != 'pull_request' || steps.seekingTesters.outputs.found == 'true') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PLUGIN_NAME }}-linux-${{ matrix.arch }}-${{ steps.setup.outputs.commitHash }}
           path: ${{ github.workspace }}/plugin/release/${{ env.PLUGIN_NAME }}-*-linux-${{ matrix.arch }}.*
@@ -273,13 +273,13 @@ jobs:
         shell: pwsh
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           path: plugin
           submodules: recursive
 
       - name: Checkout obs-studio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: 'obsproject/obs-studio'
           path: obs-studio
@@ -345,7 +345,7 @@ jobs:
 
       - name: Upload Build Artifact
         if: ${{ success() && (github.event_name != 'pull_request' || steps.seekingTesters.outputs.found == 'true') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PLUGIN_NAME }}-windows-${{ matrix.arch }}-${{ steps.setup.outputs.commitHash }}
           path: ${{ github.workspace }}/plugin/release/${{ env.PLUGIN_NAME }}-*.zip
@@ -366,7 +366,7 @@ jobs:
 
       - name: Upload Installer Artifact
         if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PLUGIN_NAME }}-windows-${{ matrix.arch }}-${{ steps.setup.outputs.commitHash }}-installer
           path: ${{ github.workspace }}/plugin/release/${{ env.PLUGIN_NAME }}-*.exe
