@@ -514,25 +514,14 @@ void noice::ui::frame::basicstats::Update()
 
 		obs_service_t *service = obs_output_get_service(output);
 		if (!service) {
-			std::string id = ValueOrEmpty(obs_output_get_id(output));
-			if (id == "replay_buffer") {
+			std::string name = ValueOrEmpty(obs_output_get_name(output));
+
+			// For backwards compatibility with the standard OBS Stats, ignore the rest
+			if (name != "adv_ffmpeg_output" && name != "adv_file_output") {
 				obs_weak_output_release(outputWeak);
 				return true;
 			}
-
-			std::string name = ValueOrEmpty(obs_output_get_name(output));
-			if (name == "adv_ffmpeg_output" || name == "adv_file_output") {
-				name = std::string();
-			}
-
-			if (name.empty()) {
-				self->AddOutputLabels(outputWeak, true, QTStr("Basic.Stats.Output.Recording"));
-			} else {
-				QString recording = QTStr("Basic.Stats.Output.Recording");
-				recording += QString::fromStdString(" ");
-				recording += QString::fromStdString(name);
-				self->AddOutputLabels(outputWeak, true, recording);
-			}
+			self->AddOutputLabels(outputWeak, true, QTStr("Basic.Stats.Output.Recording"));
 		} else {
 			obs_data_t *settings = obs_service_get_settings(service);
 			// Service name from OBS
