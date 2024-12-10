@@ -12,6 +12,10 @@ if(NOT STANDALONE AND NOT MODERN_OBS)
   include(../cmake/QtHelper.cmake)
 endif()
 
+if(NOT COMMAND find_qt)
+  include(../cmake/QtHelper.cmake)
+endif()
+
 find_qt(COMPONENTS Widgets Core)
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt::Core Qt::Widgets)
 set_target_properties(
