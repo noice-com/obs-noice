@@ -704,12 +704,45 @@ obs_source_t *noice::source::scene_tracker::get_current_scene(bool preview)
 	return obs_weak_source_get_source(source);
 }
 
+struct scene_source_mix31 {
+	obs_source_t *source;
+	obs_source_t *transition;
+	size_t pos;
+	size_t count;
+	bool apply_buf;
+	float buf[AUDIO_OUTPUT_FRAMES];
+};
+
+struct obs_scene31 {
+	struct obs_source *source;
+
+	bool is_group;
+	bool custom_size;
+	uint32_t cx;
+	uint32_t cy;
+
+	bool absolute_coordinates;
+	uint32_t last_width;
+	uint32_t last_height;
+
+	int64_t id_counter;
+
+	pthread_mutex_t video_mutex;
+	pthread_mutex_t audio_mutex;
+	struct obs_scene_item *first_item;
+
+	DARRAY(struct scene_source_mix31) mix_sources;
+};
+
+typedef struct obs_scene31 obs_scene31_t;
+
 // Obviously a hack for now. It'd be nice to have an official API method to query
 // the current scene related to rendering. obs_frontend_get_current_scene depends
 // frontend library and is not accurate for all use cases (Multiview etc)
 void noice::source::scene_tracker::probe_current_enum_scene_source()
 {
 	std::unique_lock<std::mutex> lock(_lock);
+	uint32_t version = obs_get_version();
 	bool found = false;
 
 	for (auto sceneptr : _current_tick_scenes) {
@@ -722,9 +755,18 @@ void noice::source::scene_tracker::probe_current_enum_scene_source()
 
 		// Ehh, we want to find the active scene instance that's already locked for rendering
 		// and that's fun with PTHREAD_MUTEX_RECURSIVE if you're in the same thread.
-		int ret = pthread_mutex_trylock(&scene->video_mutex);
-		if (ret == 0)
-			pthread_mutex_unlock(&scene->video_mutex);
+		int ret = 0;
+		if (version < MAKE_SEMANTIC_VERSION(31, 0, 0)) {
+			ret = pthread_mutex_trylock(&scene->video_mutex);
+			if (ret == 0)
+				pthread_mutex_unlock(&scene->video_mutex);
+		} else if (version >= MAKE_SEMANTIC_VERSION(31, 0, 0)) {
+			obs_scene31_t *scene31 = (obs_scene31_t *)scene;
+			ret = pthread_mutex_trylock(&scene31->video_mutex);
+			if (ret == 0)
+				pthread_mutex_unlock(&scene31->video_mutex);
+		}
+
 		// DLOG_INFO("probe_current_enum_scene_source: %p / %s: ret: %d", scene, obs_source_get_name(obs_scene_get_source(scene)), ret);
 
 		obs_source_release(source);
