@@ -128,14 +128,7 @@ void noice::configuration::probe_service_changed()
 	_current_service_obj = service_obj;
 	obs_data_t *settings = obs_service_get_settings(service_obj);
 	std::string service = ValueOrEmpty(obs_data_get_string(settings, "service"));
-	COMPILER_WARNINGS_PUSH
-#if COMPILER_MSVC
-	COMPILER_WARNINGS_DISABLE(4996)
-#else
-	COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
-#endif
-	std::string url = ValueOrEmpty(obs_service_get_url(service_obj));
-	COMPILER_WARNINGS_POP
+	std::string url = ValueOrEmpty(obs_service_get_connect_info(service_obj, OBS_SERVICE_CONNECT_INFO_SERVER_URL));
 
 	std::string prev_deployment = _deployment;
 	_noice_service_selected = (url.find(".noice.com") != std::string::npos) ? true : service.find("Noice") == 0;
@@ -148,14 +141,7 @@ void noice::configuration::probe_service_changed()
 		else
 			_deployment = NOICE_DEPLOYMENT_PRD;
 
-		COMPILER_WARNINGS_PUSH
-#if COMPILER_MSVC
-		COMPILER_WARNINGS_DISABLE(4996)
-#else
-		COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
-#endif
-		const char *svc_key = obs_service_get_key(service_obj);
-		COMPILER_WARNINGS_POP
+		const char *svc_key = obs_service_get_connect_info(service_obj, OBS_SERVICE_CONNECT_INFO_STREAM_ID);
 		_stream_key = std::string(svc_key);
 	} else {
 		_stream_key = std::string("");

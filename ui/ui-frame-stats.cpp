@@ -539,14 +539,7 @@ void noice::ui::frame::basicstats::Update()
 
 			// Map against services known through services.json
 			if (serviceName.empty()) {
-				COMPILER_WARNINGS_PUSH
-#if COMPILER_MSVC
-				COMPILER_WARNINGS_DISABLE(4996)
-#else
-				COMPILER_WARNINGS_DISABLE("-Wdeprecated-declarations")
-#endif
-				QString url(obs_service_get_url(service));
-				COMPILER_WARNINGS_POP
+				QString url(obs_service_get_connect_info(service, OBS_SERVICE_CONNECT_INFO_SERVER_URL));
 				serviceName = self->UrlToService(url.toStdString());
 
 				// Fallback to plain hostname
