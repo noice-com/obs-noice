@@ -486,16 +486,11 @@ else()
   if(OS_POSIX)
     # Paths to binaries and plugins differ between portable and non-portable builds on Linux
     option(LINUX_PORTABLE "Build portable version (Linux)" ON)
+
     if(NOT LINUX_PORTABLE)
-      set(OBS_LIBRARY_DESTINATION ${CMAKE_INSTALL_LIBDIR})
-      set(OBS_PLUGIN_DESTINATION ${OBS_LIBRARY_DESTINATION}/obs-plugins)
-      set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
-      set(OBS_DATA_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/obs)
+      set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${OBS_LIBRARY_DESTINATION}") # Use only the absolute path.
     else()
-      set(OBS_LIBRARY_DESTINATION bin/${_ARCH_SUFFIX}bit)
-      set(OBS_PLUGIN_DESTINATION obs-plugins/${_ARCH_SUFFIX}bit)
-      set(CMAKE_INSTALL_RPATH "$ORIGIN/" "${CMAKE_INSTALL_PREFIX}/${OBS_LIBRARY_DESTINATION}")
-      set(OBS_DATA_DESTINATION "data")
+      set(CMAKE_INSTALL_RPATH "$ORIGIN/" "${CMAKE_INSTALL_PREFIX}/lib/${OBS_LIBRARY_DESTINATION}")
     endif()
 
     # Setup Linux-specific CPack values for "deb" package generation
@@ -518,6 +513,7 @@ else()
       endif()
 
       set(CPACK_OUTPUT_FILE_PREFIX ${CMAKE_SOURCE_DIR}/release)
+      set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/lib/")
 
       if(NOT LINUX_PORTABLE)
         set(CPACK_SET_DESTDIR ON)
@@ -597,11 +593,20 @@ else()
     # "lib<YOUR_PLUGIN_NAME>"
     set_target_properties(${target} PROPERTIES PREFIX "")
 
+    # Set OBS_LIBRARY_DESTINATION and OBS_DATA_DESTINATION based on the target.
+    if(OS_WINDOWS)
+      set(OBS_LIBRARY_DESTINATION "obs-plugins/${target}/bin/${_ARCH_SUFFIX}bit")
+      set(OBS_DATA_DESTINATION "obs-plugins/${target}")
+    else()
+      set(OBS_LIBRARY_DESTINATION "obs-studio/plugins/${target}/bin/${_ARCH_SUFFIX}bit")
+      set(OBS_DATA_DESTINATION "obs-studio/plugins/${target}")
+    endif()
+
     # Set install directories
     install(
       TARGETS ${target}
-      RUNTIME DESTINATION "${OBS_PLUGIN_DESTINATION}" COMPONENT ${target}_Runtime
-      LIBRARY DESTINATION "${OBS_PLUGIN_DESTINATION}"
+      RUNTIME DESTINATION "${OBS_LIBRARY_DESTINATION}" COMPONENT ${target}_Runtime
+      LIBRARY DESTINATION "${OBS_LIBRARY_DESTINATION}"
               COMPONENT ${target}_Runtime
               NAMELINK_COMPONENT ${target}_Development)
 
@@ -631,7 +636,7 @@ else()
     endif()
 
     # Add resources from data directory
-    setup_target_resources(${target} obs-plugins/${target})
+    setup_target_resources(${target} "")
 
     # Set up plugin for testing in available OBS build on Windows
     if(OS_WINDOWS AND DEFINED OBS_BUILD_DIR)
